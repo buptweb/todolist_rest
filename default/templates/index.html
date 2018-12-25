@@ -1,0 +1,191 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>ToDoList</title>
+    <link href="http://apps.bdimg.com/libs/bootstrap/3.3.0/css/bootstrap.min.css" rel="stylesheet">
+    <script src="http://apps.bdimg.com/libs/jquery/2.0.0/jquery.min.js"></script>
+    <script src="http://apps.bdimg.com/libs/bootstrap/3.3.0/js/bootstrap.min.js"></script>
+</head>
+<body>
+<div class="wrapper">
+    <div class="row">
+        <div class="col-md-8 col-md-offset-2">
+            <h1>ToDoList</h1>
+            <hr>
+            <a href="/logout/" type="button" class="btn btn-warning pull-right ">注销</a>
+            <a id="btnAdd" type="button" class="btn btn-success pull-right">添加</a>
+            <table id="todotable" class="table table-hover">
+                <thead>
+                <tr>
+                    <th class="hidden">id</th>
+                    <th class="text-center" style="width:10%">序号</th>
+                    <th class="text-left" style="width:60%">内容</th>
+                    <th class="text-center" style="width:30%">操作</th>
+                </tr>
+                </thead>
+                <tbody>
+                </tbody>
+            </table>
+            <hr>
+        </div>
+    </div>
+</div>
+
+<!-- Bootstrap modal -->
+<div class="modal fade" id="modal_form" role="dialog">
+    <div class="modal-dialog">
+        <div class="modal-content">
+            <div class="modal-header">
+                <button type="button" class="close" data-dismiss="modal" aria-label="Close"><span
+                        aria-hidden="true">&times;</span></button>
+                <h3 class="modal-title">新建备忘事项</h3>
+            </div>
+            <div class="modal-body form">
+                <form action="#" id="form" class="form-horizontal">
+                    <div class="form-body">
+                        <div class="form-group">
+                            <label class="control-label col-md-3">备忘事项</label>
+                            <div class="col-md-9">
+                                <input name="content" placeholder="备忘事项" class="form-control" type="text">
+                            </div>
+                        </div>
+                    </div>
+                </form>
+            </div>
+            <div class="modal-footer">
+                <button type="button" id="btnSave" class="btn btn-primary">Save</button>
+                <button type="button" class="btn btn-danger" data-dismiss="modal">Cancel</button>
+            </div>
+        </div>
+        <!-- /.modal-content -->
+    </div>
+    <!-- /.modal-dialog -->
+</div>
+<!-- /.modal -->
+<!-- End Bootstrap modal -->
+
+
+<script>
+    $(document).ready(
+            $.ajaxSetup({
+                beforeSend: function(xhr, settings) {
+                    if (!csrfSafeMethod(settings.type) && !this.crossDomain) {
+                        xhr.setRequestHeader("X-CSRFToken", getCookie('csrftoken'));
+                    }
+                }
+            }),
+            $("#btnAdd").click(
+                    function () {
+                        save_method = 'add';
+                        $('#form')[0].reset(); // 重置form
+                        $('#modal_form').modal('show'); // 显示modal
+                        $('.modal-title').text('新建备忘'); // 设置title
+                    }
+            ),
+            $("#btnSave").click(
+                    function () {
+                        var url;
+                        if (save_method == 'add') {
+                            url = "/api/todos/";
+                            method = "POST";
+                        }
+                        else {
+                            url = "/api/todos/"+item_id+"/";
+                            method = "PATCH";
+                        }
+                        $.ajax({
+                            url: url,
+                            type: method,
+                            contentType: "application/json; charset=utf-8",
+                            data: JSON.stringify({'content':$('[name="content"]').val()}),
+                            dataType: "JSON",
+                            success: function (data) {
+                                //如果成功，隐藏弹出框并重新加载数据
+                                $('#modal_form').modal('hide');
+                                reload_table();
+                            },
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                alert('新建或添加错误！');
+                            }
+                        })
+                    }
+            ),
+            $("#todotable").on('click', ".btnEdit", function () {
+                        save_method = 'update';
+                        item_id = $(this).parent("td").siblings("td.hidden").text()
+                        $('#form')[0].reset();
+                        $('[name="content"]').val($(this).parent("td").prev().text());
+                        $('#modal_form').modal('show');
+                        $('.modal-title').text('编辑备忘');
+
+                    }
+            ),
+            $("#todotable").on('click', ".btnDel", function () {
+                        $.ajax({
+                            url: "/api/todos/"+$(this).parent("td").siblings("td.hidden").text()+"/",
+                            type: "delete",
+                            dataType: "JSON",
+                            success: function (data) {
+                                //如果成功，隐藏弹出框并重新加载数据
+                                $('#modal_form').modal('hide');
+                                reload_table();
+                            },
+                            error: function (jqXHR, textStatus, errorThrown) {
+                                alert('删除错误！');
+                            }
+                        })
+                    }
+            ),
+            reload_table()
+    )
+    function reload_table() {
+        $.ajax({
+            url: "/api/todos/",
+            type: "get",
+            dataType: "JSON",
+            success: function (data) {
+                $("#todotable").children("tbody").empty()
+                var htmlstr = ""
+                for (var i = 0; i < data.length; i++) {
+                    htmlstr = htmlstr + "<tr>" +
+                            "<td class='hidden'>" + data[i].id + "</td>" +
+                            "<td>" + (i + 1) + "</td>" +
+                            "<td>" + data[i].content + "</td>" +
+                            "<td class='text-center'>" +
+                            "<a type='button' class='btn btn-xs btn-success btnEdit'>编辑</a>" +
+                            "<a type='button' class='btn btn-xs btn-danger btnDel'>删除</a>" +
+                            "</td>" +
+                            "</tr>";
+                }
+
+                $("#todotable").children("tbody").html(htmlstr);
+            },
+            error: function (jqXHR, textStatus, errorThrown) {
+                alert('获取数据错误');
+            }
+        })
+    }
+    function getCookie(name) {
+        var cookieValue = null;
+        if (document.cookie && document.cookie !== '') {
+            var cookies = document.cookie.split(';');
+            for (var i = 0; i < cookies.length; i++) {
+                var cookie = jQuery.trim(cookies[i]);
+                // Does this cookie string begin with the name we want?
+                if (cookie.substring(0, name.length + 1) === (name + '=')) {
+                    cookieValue = decodeURIComponent(cookie.substring(name.length + 1));
+                    break;
+                }
+            }
+        }
+        return cookieValue;
+    }
+    function csrfSafeMethod(method) {
+    // these HTTP methods do not require CSRF protection
+        return (/^(GET|HEAD|OPTIONS|TRACE)$/.test(method));
+    }
+
+
+</script>
+</body>
+</html>
